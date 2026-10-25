@@ -1,5 +1,17 @@
 pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            // resolve the loom plugin marker directly to the artifact: the marker
+            // coordinates published by architectury aren't discoverable in the
+            // local mirror, but the descriptor inside the jar maps the ids
+            if (requested.id.id == 'dev.architectury.loom-no-remap' || requested.id.id == 'dev.architectury.loom') {
+                useModule('dev.architectury:architectury-loom:' + requested.version)
+            }
+        }
+    }
     repositories {
+        // local mirror of maven.architectury.dev artifacts (that server stalls after ~16KB per connection on some networks)
+        if (file("$rootDir/gradle/local-maven").exists()) { maven { url = file("$rootDir/gradle/local-maven") } }
         maven { url = 'https://maven.fabricmc.net/' }
         maven { url = 'https://maven.architectury.dev/' }
         maven { url = 'https://files.minecraftforge.net/maven/' }

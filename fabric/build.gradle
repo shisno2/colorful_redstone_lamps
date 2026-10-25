@@ -1,5 +1,22 @@
+
+
+
 plugins {
     id 'com.gradleup.shadow'
+}
+
+repositories {
+    if (file("$rootDir/gradle/local-maven").exists()) { maven { url = file("$rootDir/gradle/local-maven") } }
+}
+
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        // maven.architectury.dev stalls on large files on this network; the
+        // architectury-plugin inserts that repo first, so reroute the common
+        // artifact to a local mirror module (same -dev jar, plain coordinates)
+        if (file("$rootDir/gradle/local-maven").exists()) substitute module('dev.architectury:architectury') using module('dev.architectury.local:architectury-common:1.0')
+        if (file("$rootDir/gradle/local-maven").exists()) substitute module('dev.architectury:architectury-fabric') using module('dev.architectury.local:architectury-fabric:1.0')
+    }
 }
 
 architectury {
@@ -25,16 +42,16 @@ configurations {
 }
 
 dependencies {
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    implementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
     // Fabric API. This is technically optional, but you probably want it anyway.
-    modImplementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
-    modImplementation "net.fabricmc.fabric-api:fabric-data-generation-api-v1:$rootProject.fabric_api_version"
+    implementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
+    implementation "net.fabricmc.fabric-api:fabric-data-generation-api-v1:$rootProject.fabric_api_version"
 
     // Architectury API. This is optional, and you can comment it out if you don't need it.
-    modImplementation "dev.architectury:architectury-fabric:$rootProject.architectury_api_version"
+    implementation "dev.architectury:architectury-fabric:$rootProject.architectury_api_version"
 
-    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    common(project(path: ':common')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionFabric')
 }
 
@@ -64,7 +81,11 @@ shadowJar {
     archiveClassifier = 'dev-shadow'
 }
 
-remapJar {
-    inputFile.set shadowJar.archiveFile
+// no-remap loom has no remapJar; package the shadow jar (which bundles
+// the common sourceset) as the release artifact instead
+jar {
     archiveClassifier = "mc${rootProject.minecraft_version}-fabric"
+    dependsOn shadowJar
+    from zipTree(shadowJar.archiveFile)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

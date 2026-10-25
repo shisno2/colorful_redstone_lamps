@@ -2,6 +2,7 @@ package de.pasuki.colorful_redstone_lamps.message;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -13,7 +14,9 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class WelcomeMessageData extends SavedData {
-    private static final String DATA_NAME = "colorful_redstone_lamps_welcome";
+    // keep the pre-26 id ("colorful_redstone_lamps_welcome" mapped to the
+    // minecraft namespace) so existing worlds keep their shown-players state
+    private static final Identifier DATA_NAME = Identifier.fromNamespaceAndPath("minecraft", "colorful_redstone_lamps_welcome");
 
     // Feld MUSS vor dem CODEC stehen, sonst "cannot resolve symbol shownPlayers"
     private final Set<UUID> shownPlayers = new HashSet<>();

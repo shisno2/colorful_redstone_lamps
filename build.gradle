@@ -1,8 +1,34 @@
+buildscript {
+    repositories {
+        if (file("$rootDir/gradle/local-maven").exists()) { maven { url = file("$rootDir/gradle/local-maven") } }
+        maven { url = 'https://maven.architectury.dev/' }
+        gradlePluginPortal()
+    }
+    dependencies {
+        // The upstream marker publishes mismatched Gradle module metadata
+        // (component version 3.4-SNAPSHOT inside a 3.4.138 release), which
+        // Gradle 9 rejects. The marker jar is self-contained, so resolve it
+        // artifact-only.
+        classpath 'architectury-plugin:architectury-plugin.gradle.plugin:3.5.0-local@jar'
+        // transitive runtime deps of the marker POM, declared explicitly because
+        // of the artifact-only notation above (both resolve from local-maven /
+        // Maven Central)
+        classpath 'dev.architectury:architectury-transformer:5.2.92'
+        classpath 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.72'
+        // architectury loom (no-remap build for the unobfuscated 26.x era), resolved
+        // from the local mirror; the descriptor inside the jar maps both plugin ids
+        classpath 'dev.architectury:architectury-loom:1.17.1-local'
+        // architectury-plugin applies this internally
+        classpath 'org.jetbrains.gradle.plugin.idea-ext:org.jetbrains.gradle.plugin.idea-ext.gradle.plugin:1.4.1'
+    }
+}
+
 plugins {
-    id 'dev.architectury.loom' version '1.13-SNAPSHOT' apply false
-    id 'architectury-plugin' version '3.4-SNAPSHOT'
     id 'com.gradleup.shadow' version '8.3.6' apply false
 }
+
+// architectury-plugin applied via the artifact-only classpath above
+apply plugin: 'architectury-plugin'
 
 architectury {
     minecraft = project.minecraft_version
@@ -17,6 +43,9 @@ allprojects {
     version = rootProject.mod_version
 
     repositories {
+        // local mirror of maven.architectury.dev artifacts; must be declared
+        // before loom is applied because loom snapshots the repository list
+        if (file("$rootDir/gradle/local-maven").exists()) { maven { url = file("$rootDir/gradle/local-maven") } }
         maven {
             name = 'ParchmentMC'
             url = 'https://maven.parchmentmc.org'
@@ -25,7 +54,7 @@ allprojects {
 }
 
 subprojects {
-    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'dev.architectury.loom-no-remap'
     apply plugin: 'architectury-plugin'
     apply plugin: 'maven-publish'
 
@@ -35,11 +64,14 @@ subprojects {
     }
 
     repositories {
+        // local mirror of maven.architectury.dev artifacts (that server stalls
+        // after ~16KB per connection on some networks)
+        if (file("$rootDir/gradle/local-maven").exists()) { maven { url = file("$rootDir/gradle/local-maven") } }
         // Add repositories to retrieve artifacts from in here.
         // You should only use this when depending on other mods because
         // Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
         // See https://docs.gradle.org/current/userguide/declaring_repositories.html
-        // for more information about repositories.
+        // for more information about what repositories to use.
     }
 
     loom {
@@ -48,7 +80,7 @@ subprojects {
 
     dependencies {
         minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
-        mappings loom.officialMojangMappings()
+        // Minecraft is unobfuscated since 26.1; no mappings needed
     }
     java {
         // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
@@ -56,12 +88,12 @@ subprojects {
         // If you remove this line, sources will not be generated.
         withSourcesJar()
 
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
     }
 
     tasks.withType(JavaCompile).configureEach {
-        it.options.release = 21
+        it.options.release = 25
     }
 
     // Configure Maven publishing.
